@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SortBench</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>SORTBENCH</div>
+    <div class="chips">
+      <button class="chip" id="chipArm" onclick="refreshHealth()" title="Click to re-check">ARM</button>
+      <button class="chip hidden" id="chipCam" onclick="refreshHealth()" title="Click to re-check">CAMERA</button>
+      <button class="chip sim" id="simToggle" onclick="toggleSimulate()" title="Click to switch between simulating and moving the real arm">SIMULATING</button>
+      <button class="chip" onclick="openSettings()">SETTINGS</button>
+    </div>
+  </header>
+
+  <div class="mode-switch">
+    <button class="seg active" id="modeManual" onclick="setMode('manual')">MANUAL ENTRY</button>
+    <button class="seg" id="modeCamera" onclick="setMode('camera')">PHONE CAMERA</button>
+  </div>
+
+  <section class="card" id="sortCard">
+
+    <div class="step"><span class="num">1</span>The cubes</div>
+
+    <div id="manualInput">
+      <label class="lbl" for="digitsManual">Type the 3 digits in the order you will hand the cubes to the arm</label>
+      <input type="text" id="digitsManual" placeholder="e.g. 3, 8, 2" autocomplete="off">
+    </div>
+
+    <div id="cameraInput" class="hidden">
+      <div class="row">
+        <button class="btn" id="scanBtn" onclick="scanCubes(false)">SCAN CUBES</button>
+        <label class="btn ghost" for="photoFile">or scan a photo file</label>
+        <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="scanPhotoFile()">
+      </div>
+      <div id="scanInfo" class="note"></div>
+      <img id="scanImg" class="scan-img hidden" alt="Detected cubes">
+      <label class="lbl" for="digitsCamera">Detected, left to right (fix it here if a digit is wrong)</label>
+      <input type="text" id="digitsCamera" placeholder="press SCAN CUBES" autocomplete="off">
+    </div>
+
+    <div class="step"><span class="num">2</span>Sort order</div>
+    <div class="row">
+      <select id="sortMode">
+        <option value="ascending">Ascending (0 to 9)</option>
+        <option value="descending">Descending (9 to 0)</option>
+        <option value="evenodd">Evens first, then odds</option>
+      </select>
+      <button class="btn accent" id="startBtn" onclick="startSession()">START</button>
+    </div>
+
+    <div class="step"><span class="num">3</span>Sort</div>
+    <div id="slots" class="slot-row"></div>
+    <div id="prompt" class="prompt"></div>
+    <div class="row">
+      <button class="btn primary big" id="nextBtn" onclick="placeNext()" disabled>PLACE CUBE</button>
+      <button class="btn" id="resetBtn" onclick="resetSession(false)">RESET</button>
+      <button class="btn warn" id="homeBtn" onclick="homeArm()">HOME ARM</button>
+    </div>
+    <div id="message" class="message"></div>
+  </section>
+
+  <details class="card" id="armCard">
+    <summary>Manual arm control</summary>
+    <p class="note">Type joints and angles, for example <code>base 56, shoulder 40</code>, then press GO. The arm only moves when Simulate is off.</p>
+    <div class="row">
+      <input type="text" id="armCmd" placeholder="base 56, shoulder 40" autocomplete="off">
+      <button class="btn primary" id="armGo" onclick="runArmCommand()">GO</button>
+    </div>
+    <table class="pose">
+      <thead><tr><th>Joint</th><th>Now</th><th>Safe range</th><th>Jog</th></tr></thead>
+      <tbody>
+        <tr><td>Base</td><td id="pose_base">-</td><td id="range_base">-</td>
+          <td class="jogs"><button onclick="jog('base',-5)">-5</button><button onclick="jog('base',-1)">-1</button><button onclick="jog('base',1)">+1</button><button onclick="jog('base',5)">+5</button></td></tr>
+        <tr><td>Shoulder</td><td id="pose_shoulder">-</td><td id="range_shoulder">-</td>
+          <td class="jogs"><button onclick="jog('shoulder',-5)">-5</button><button onclick="jog('shoulder',-1)">-1</button><button onclick="jog('shoulder',1)">+1</button><button onclick="jog('shoulder',5)">+5</button></td></tr>
+        <tr><td>Elbow</td><td id="pose_elbow">-</td><td id="range_elbow">-</td>
+          <td class="jogs"><button onclick="jog('elbow',-5)">-5</button><button onclick="jog('elbow',-1)">-1</button><button onclick="jog('elbow',1)">+1</button><button onclick="jog('elbow',5)">+5</button></td></tr>
+        <tr><td>Gripper</td><td id="pose_gripper">-</td><td id="range_gripper">-</td>
+          <td class="jogs"><button onclick="jog('gripper',-5)">-5</button><button onclick="jog('gripper',-1)">-1</button><button onclick="jog('gripper',1)">+1</button><button onclick="jog('gripper',5)">+5</button></td></tr>
+      </tbody>
+    </table>
+    <div class="row">
+      <button class="btn" id="readBtn" onclick="refreshPose()">READ ARM</button>
+      <span id="armMsg" class="note"></span>
+    </div>
+    <p class="note small">Right after the arm is powered up the angles shown are guesses (90), and the first move of each joint jumps straight to its target. Keep the first commands close to where the arm already is.</p>
+  </details>
+
+  <details class="card hidden" id="cameraCard">
+    <summary>Camera tools</summary>
+    <div class="row">
+      <button class="btn" id="liveBtn" onclick="toggleLive()">SHOW LIVE VIEW</button>
+      <button class="btn" id="roiBtn" onclick="startRoi()">SET PICK AREA</button>
+      <button class="btn ghost" onclick="clearRoi()">CLEAR PICK AREA</button>
+    </div>
+    <div id="roiInfo" class="note"></div>
+    <div class="stage hidden" id="liveWrap"><img id="liveFeed" alt="Live camera feed"></div>
+    <div class="stage hidden" id="roiStage"><img id="roiImg" alt="Snapshot" draggable="false"><div id="roiBox" class="roi-box hidden"></div></div>
+    <div class="row hidden" id="roiActions"><button class="btn accent" onclick="saveRoi()">SAVE PICK AREA</button></div>
+  </details>
+
+</div>
+
+<div id="settingsOverlay" class="overlay hidden">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="field"><label for="phoneIp">Phone IP (IP Webcam)</label><input type="text" id="phoneIp" placeholder="192.168.1.42"></div>
+    <div class="field"><label for="phonePort">Phone port</label><input type="number" id="phonePort" value="8080"></div>
+    <div class="field"><label for="cameraRotation">Camera rotation</label>
+      <select id="cameraRotation">
+        <option value="0">None (0)</option>
+        <option value="90">Rotate 90</option>
+        <option value="180">Rotate 180</option>
+        <option value="270">Rotate 270</option>
+      </select></div>
+    <div class="field"><label for="armSerialPort">Arm USB port</label><input type="text" id="armSerialPort" placeholder="leave empty to auto-detect, or COM6"></div>
+    <div class="row">
+      <button class="btn primary" onclick="saveSettings()">SAVE</button>
+      <button class="btn" onclick="closeSettings()">CLOSE</button>
+      <span id="settingsStatus" class="note"></span>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

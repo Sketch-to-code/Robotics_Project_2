@@ -1,0 +1,17 @@
+{
+  "phone_ip": "10.50.185.230",
+  "phone_port": 8080,
+  "arm_serial_port": "",
+  "arm_baud": 115200,
+  "arm_ip": "10.206.68.91",
+  "arm_port": 80,
+  "simulate_arm": false,
+  "camera_rotation": 0,
+  "use_live_camera": false,
+  "handoff_roi": [
+    973,
+    144,
+    1658,
+    622
+  ]
+}
